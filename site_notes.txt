@@ -1,0 +1,3 @@
+* Used iconifier.net to generate the icons
+* Used Jekyll to generate the site then transmit to sync up the _site folder.
+
