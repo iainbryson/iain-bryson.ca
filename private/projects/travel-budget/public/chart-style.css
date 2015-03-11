@@ -1,0 +1,41 @@
+
+.axis path,
+.axis line {
+  fill: none;
+  stroke: black;
+  shape-rendering: crispEdges;
+}
+.axis, .legend-text, .legend-title, series-label {
+  font-family: Segoe UI Light, "Open Sans Light", Verdana, Sans-Serif;
+}
+.xaxis text {
+}
+.axis,
+.legend-text {
+  font-size: 10pt;
+}
+.series-label {
+  font-size: 16px;
+}
+.legend-title {
+  font-size: 13pt;
+}
+.tooltip {
+  color: #dddddd;
+  background-color: rgb(80,80,80);
+  background-color: rgba(80,80,80,.9);
+}
+
+
+div.chart {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.chart-line {
+    stroke-width: 5;
+}
+
+.barrect {
+    opacity: 0.5;
+}
