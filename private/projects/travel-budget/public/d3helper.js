@@ -68,3 +68,11 @@ movingAvg = function(n) {
         return pathDesc.slice(1, pathDesc.length);
     }
 }
+
+// Rotate text on x axis
+// solution based on idea here: https://groups.google.com/forum/?fromgroups#!topic/d3-js/heOBPQF3sAY
+// first move the text left so no longer centered on the tick
+// then rotate up to get 45 degrees.
+rotateLabelText = function(d) {
+     return "translate(" + this.getBBox().height*-2 + "," + this.getBBox().height + ")rotate(-45)";
+}

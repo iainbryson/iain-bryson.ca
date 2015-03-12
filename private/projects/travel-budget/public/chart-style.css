@@ -12,13 +12,19 @@
 }
 .axis,
 .legend-text {
-  font-size: 10pt;
+  font-size: .8em;
 }
 .series-label {
-  font-size: 16px;
+  font-size: 1.125em;
+  @media only screen and (min-width: 768px) {
+    /* tablets and desktop */
+  font-size: 1.425em;
+  }
+  dy: .1em;
+  dx: .4em;
 }
 .legend-title {
-  font-size: 13pt;
+  font-size: .9em;
 }
 .tooltip {
   color: #dddddd;
@@ -35,9 +41,11 @@
 
 svg.chart, div.chart {
     display: inline-block;
-    position: relative;
+    position: absolute;
+    bottom: 10px;
+    top: 100px;
     width: 100%;
-    padding-bottom: 66%; /* aspect ratio */
+/*    padding-bottom: 66%; /* aspect ratio */
     vertical-align: top;
     overflow: hidden;
 }
