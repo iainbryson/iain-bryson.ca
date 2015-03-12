@@ -5,7 +5,7 @@
   stroke: black;
   shape-rendering: crispEdges;
 }
-.axis, .legend-text, .legend-title, series-label {
+.axis, .legend-text, .legend-title, series-label, .tooltip {
   font-family: Segoe UI Light, "Open Sans Light", Verdana, Sans-Serif;
 }
 .xaxis text {
@@ -26,16 +26,43 @@
   background-color: rgba(80,80,80,.9);
 }
 
+.tooltip div {
+    margin: 0;
+    padding: .2em .5em 1em .2em;
+    border: solid lightblue 3px;
+    text-align: center;
+}
 
-div.chart {
-    max-width: 100%;
-    max-height: 100%;
+svg.chart, div.chart {
+    display: inline-block;
+    position: relative;
+    width: 100%;
+    padding-bottom: 66%; /* aspect ratio */
+    vertical-align: top;
+    overflow: hidden;
+}
+
+svg.chartsvg {
+    display: inline-block;
+    position: absolute;
+    top: 0px;
+    left: 0;
+}
+
+svg {
+    border: solid 1px #ccc;
+    font: 10px sans-serif;
 }
 
 .chart-line {
     stroke-width: 5;
 }
 
+#header {
+ background-color:blue;
+}
+
 .barrect {
     opacity: 0.5;
 }
+
