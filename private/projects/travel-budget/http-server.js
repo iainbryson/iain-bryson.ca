@@ -1,14 +1,22 @@
 var express = require("express"),
+    travel_data = require("./travel-data.js"),
     app = express(),
     bodyParser = require('body-parser'),
     errorHandler = require('errorhandler'),
-    methodOverride = require('method-override'),
-    hostname = process.env.HOSTNAME || 'localhost',
-    port = parseInt(process.env.PORT, 10) || 4567,
-    publicDir = process.argv[2] || __dirname + '/public';
+    methodOverride = require('method-override');
+    
+exports.publicDir = process.argv[2] || __dirname + '/public';
 
 app.get("/", function (req, res) {
   res.redirect("/index.html");
+});
+
+app.get("/data", function (req, res) {
+    var store = '';
+
+    res.setHeader("Content-Type", "text/json");
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.end(JSON.stringify(budget_info))
 });
 
 app.use(methodOverride());
@@ -16,13 +24,10 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({
   extended: true
 }));
-app.use(express.static(publicDir));
+app.use(express.static(exports.publicDir));
 app.use(errorHandler({
   dumpExceptions: true,
   showStack: true
 }));
-
-console.log("Simple static server showing %s listening at http://%s:%s", publicDir, hostname, port);
-app.listen(port, hostname);
 
 exports.app = app;

@@ -116,8 +116,17 @@ function renderDailyAreaChart(data, rootElement, config) {
         g.each(function() {
             var g = d3.select(this);
             g
-                .attr("x", function(d) { return xScale(d[0].x); })
-                .attr("y", function(d) { return yScale(d[0].y + d[0].y0); });
+                .attr("x", function(d) { return xScale(d.x); })
+                .attr("y", function(d) { return yScale(d.y); });
+        } );
+    };
+
+    var titleSeriesLabel = function(g) {
+        g.each(function() {
+            var g = d3.select(this);
+            g
+                .attr("x", function(d) { return xScale(d.x); })
+                .attr("y", function(d) { return yScale(yExtent[1]*0.8); });
         } );
     };
 
@@ -204,13 +213,32 @@ function renderDailyAreaChart(data, rootElement, config) {
         .append("svg:g")
         .selectAll(".series-label");
         
+    var series_label_data = $.map(average_layout_data, function (d) { d[0].y += d[0].y0; return d; })
+    var last_series_label = series_label_data[series_label_data.length-1];
+    
+    var titles_data = [({x: series_label_data[series_label_data.length-1].x, y: yScale.invert(40), legend_item : { series_label: "Daily Average $"+last_series_label.y.toFixed(2) }})];
+    
    series_label
-        .data(average_layout_data)
+        .data(series_label_data)
         .enter()
             .append("svg:text")
             .attr("class", "series-label")
-            .text(function(d)      { return d[0].legend_item.series_label; })
+            .attr("text-anchor", "start")
+            .attr("alignment-baseline", "middle")
+            .text(function(d)      { return d.legend_item.series_label; })
             .call(seriesLabel);
+
+   var titles = vis
+          .append("svg:g")
+        .selectAll(".title-series-label")
+        .data(titles_data)
+        .enter()
+            .append("svg:text")
+            .attr("class", "title-series-label")
+            .attr("text-anchor", "start")
+            .attr("alignment-baseline", "middle")
+            .text(function(d)      { return d.legend_item.series_label; })
+            .call(titleSeriesLabel);
 
     function resize() {
         var width = parseInt(d3.select(dom_element).style("width"), 10),
@@ -249,7 +277,7 @@ function renderDailyAreaChart(data, rootElement, config) {
         xAxis.ticks(Math.max(width/50, 2));
 
         chartsvg
-           .attr("width", width + margin*2-2)
+           .attr("width", width + margin*1)
            .attr("height", height + margin*2-2);
 
         vis.select('.xaxis')
@@ -262,15 +290,49 @@ function renderDailyAreaChart(data, rootElement, config) {
         vis.select('.yaxis')
            .call(yAxis);
 
-        vis.selectAll(".series-label")
-           .call(seriesLabel);
-        
         vis.selectAll(".barrect")
            .call(barrect);
 
         _.each(legend_item, function(d, i) {
             vis.selectAll(".series"+i).attr("d", lines[i]());
         } );
+        
+        var foci = [], labels=[];
+        
+        series_label_data.forEach(function(d, i) {
+            foci.push({x: d.x, y: d.y});
+        });
+
+        // Create the force layout with a slightly weak charge
+        var force = d3.layout.force()
+            .nodes(series_label_data)
+            .charge(-20)
+            .chargeDistance(7)
+            .gravity(0)
+            .size([width, height]);
+
+        force.on("tick", function(e) {
+            console.log('tick');
+            var k = .1 * e.alpha;
+            series_label_data.forEach(function(o, j) {
+                // The change in the position is proportional to the distance
+                // between the label and the corresponding place (foci)
+                o.y += (foci[j].y - o.y) * k;
+                //o.x += (foci[j].x - o.x) * k;
+            });
+
+            // Update the position of the text element
+            vis.selectAll(".series-label")
+               .call(seriesLabel);
+        });
+
+        vis.selectAll(".series-label")
+           .call(seriesLabel);
+        vis.selectAll(".title-series-label")
+           .call(titleSeriesLabel);
+
+        force.start();
+
     }
 
     d3.select(window).on('resize', resize);
