@@ -1,6 +1,6 @@
 var http_server = require('./http-server');
 
-hostname = process.env.HOSTNAME || 'localhost',
+hostname = process.env.HOSTNAME || '0.0.0.0',
 port = parseInt(process.env.PORT, 10) || 4567,
 
 console.log("Simple server showing %s listening at http://%s:%s", http_server.publicDir, hostname, port);

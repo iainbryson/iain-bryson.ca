@@ -81,3 +81,7 @@ svg {
     opacity: 0.5;
 }
 
+text.topbars {
+    fill: #ddd;
+    font-size: 2em;
+}

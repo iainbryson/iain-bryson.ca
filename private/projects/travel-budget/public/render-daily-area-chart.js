@@ -6,31 +6,48 @@ function renderDailyAreaChart(data, rootElement, config) {
     var date_map = data.date_map;
     var descriptions = data.details;
     var labels = data.legend_labels;
+    var raw_data = data.raw;
     var title = data.title;
     var dom_element = '#'+rootElement;
     
-    var stack_data = new Array();
-    var stack_data2 = new Array(labels.length);
+    var stack_data = new Array(labels.length);
     var dates = [];
     var i;
     
-    for (i = 0; i < labels.length; i++) { stack_data2[i] = []; }
+    for (i = 0; i < labels.length; i++) { stack_data[i] = []; }
     for (var date in date_map) {
         if (date_map.hasOwnProperty(date)) {
             dates.push(new Date(date));
         }
     }
+    
+    var raw_expenses = [];
+    
+    var reverse_dates = {}; // dunno why indexOf doesn't work
+    
     dates = dates.sort(function(lhs, rhs) { return (rhs.getTime() > lhs.getTime() ? 1 : (rhs.getTime() < lhs.getTime() ? -1 : 0 ) ); } ).reverse();
+    _.each(dates, function(d, i) { reverse_dates[d] = i; });
+    
     for (var date_idx = 0; date_idx < dates.length; date_idx++) {
-        stack_data.push(date_map[dates[date_idx]]);
         for (i = 0; i < date_map[dates[date_idx]].y.length; i++) {
-            stack_data2[i].push({ label :   labels[i],
-                                  x :       date_idx,
-                                  y :       date_map[dates[date_idx]].y[i],
-                                  details : date_map[dates[date_idx]].details[i]});
+            var el = {
+                  label :   labels[i],
+                  label_idx : i,
+                  x :       date_idx,
+                  y :       date_map[dates[date_idx]].y[i],
+                  details : date_map[dates[date_idx]].details[i]
+            }
+            raw_expenses.push(el);
+            stack_data[i].push(el);
         }
     }
-
+    
+    _.each(raw_data, function(d) { d.x = reverse_dates[d.x]; d.label = labels[d.category_idx]; });
+    var sorted_expenses = raw_data.sort(function(lhs, rhs) { return rhs.y > lhs.y ? 1 : (rhs.y < lhs.y ? -1 : 0) });
+    var top_expenses = sorted_expenses.slice(0, 10);
+    
+    _.each(top_expenses, function(d, i) { d.expense_order = i; });
+    
     var average_stack_data = [];
     _.each(labels, function(d, i) {
         average_stack_data.push([ { label : labels[i],
@@ -38,7 +55,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                                     y :     d3.sum(dates, function(d) { return date_map[d].y[i]; }) / dates.length }]);
     } );
 
-    var stack_layout_data = d3.layout.stack().offset(0)(stack_data2);
+    var stack_layout_data = d3.layout.stack().offset(0)(stack_data);
     var average_layout_data = d3.layout.stack().offset(0)(average_stack_data);
 
     var w = config.width,
@@ -48,7 +65,7 @@ function renderDailyAreaChart(data, rootElement, config) {
         inner_pad = 20,
         left_pad = 100,
         sampsize = dates.length,
-        maxval = d3.max(stack_data, function(d) { return d3.sum(d.y); }),
+        maxval = d3.max(_.map(dates, function(d) { return date_map[d]; }), function(d) { return d3.sum(d.y); }),
         bottom = h-inner_pad,
         xExtent = d3.extent([0,sampsize]),
         xExtentDates = [dates[0], dates[dates.length-1]],
@@ -69,6 +86,14 @@ function renderDailyAreaChart(data, rootElement, config) {
         average_stack_data[i][0].legend_item = legend_item[i];
         average_stack_data[i][0].legend_item.series_label = legend_item[i].name + " $"+average_stack_data[i][0].y.toFixed(2) + " Avg.";
     }
+    
+    var bar_stack_y0 = {};
+    _.each(stack_layout_data, function(d,i) {
+        bar_stack_y0[i] = {};
+        _.each(d, function(d, j) {
+            bar_stack_y0[i][j] = d.y0;
+        });
+    });
 
     var color_by_type = function(d) {
         if (!legend_item.hasOwnProperty(d.type)) return 'rgba(180,180,180, 0.5)';
@@ -112,6 +137,18 @@ function renderDailyAreaChart(data, rootElement, config) {
         });
     };
     
+    var topbars = function(g) {
+
+//g.each(function() {
+  //          var g = d3.select(this);
+            g
+                .attr("width", (xScale(1)-xScale(0)) * 0.80 )
+                .attr("y", function(d) { return yScale(bar_stack_y0[d.category_idx][d.x]+d.y); })
+                .attr("x", function(d) { return xScale(d.x); })
+                .attr("height", function(d) { return Math.abs(yScale(0) - yScale(d.y)); });
+    //    });
+    }
+    
     var seriesLabel = function(g) {
         g.each(function() {
             var g = d3.select(this);
@@ -146,8 +183,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                 var date = xScaleDates.invert(m[0]);
                 var dialog_html = '<h2> '+ d3.time.format('%B %d')(date) + '</h2><br/>';//<table>';
                 dialog_html += "<ul>" + d.details + "</ul>";
-                console.log(dialog_html);
-                var areachartDialog = $('#areachartDialog');
+                var areachartDialog = $('#'+dialogElementName);
                 areachartDialog.html(dialog_html);
                 areachartDialog.dialog('open');
             } )
@@ -240,6 +276,28 @@ function renderDailyAreaChart(data, rootElement, config) {
             .text(function(d)      { return d.legend_item.series_label; })
             .call(titleSeriesLabel);
 
+
+
+    var top_bars = vis.selectAll(".topBars")
+        .append("svg:g")
+        .data(top_expenses).enter()
+        .append("svg:g");
+        
+    top_bars.append("rect")
+        .style("fill", function(d) { return legend_item[d.category_idx % legend_item.length].color; })
+        .attr("class", "topbars")
+        .attr('opacity', 0)
+        .call(topbars);
+        
+    top_bars.append("svg:text")
+        .attr("class", "topbars")
+        .text(function(d) { return d.detail; } )
+        .call(topbars)
+        .attr("dy", "1.5em")
+        .attr("dx", "0.5em")
+        .attr('opacity', 0);
+
+
     function resize() {
         var width = parseInt(d3.select(dom_element).style("width"), 10),
         height = parseInt(d3.select(dom_element).style("height"), 10);
@@ -293,6 +351,9 @@ function renderDailyAreaChart(data, rootElement, config) {
         vis.selectAll(".barrect")
            .call(barrect);
 
+        vis.selectAll(".topbars")
+            .call(topbars);
+
         _.each(legend_item, function(d, i) {
             vis.selectAll(".series"+i).attr("d", lines[i]());
         } );
@@ -338,4 +399,31 @@ function renderDailyAreaChart(data, rootElement, config) {
     d3.select(window).on('resize', resize);
 
     resize();
+    
+    var showTop = function(show) {
+        if (show) {
+            vis.selectAll(".topbars")
+                .attr('opacity', 10.0)
+            .transition()
+                .attr("x", (xScale(dates.length) - 400)/2)
+                .attr("y", function(d) { return d.expense_order*50; } )
+                .attr("height", 40 )
+                .attr("width", 400)
+                .each("end", function() {
+                     vis.selectAll("text.topbars").attr('opacity', 1.0);
+                });
+        } else {
+            vis.selectAll("text.topbars").attr('opacity', 0.0);
+            vis.selectAll(".topbars")
+            .transition().call(topbars)
+                .each("end", function() {
+                     vis.selectAll(".topbars").attr('opacity', 0.0);
+                });
+
+        }
+    }
+    
+    return {
+        showTop: showTop
+    };
 }

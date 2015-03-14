@@ -6,7 +6,7 @@ Spreadsheet.load({
     debug: true,
     spreadsheetId: '135pcmcYjkHgSFswlZLnf3CVagIKCiwtp1KWvbci9wIU',
 //    worksheetName: 'Expenses',,
-    WorksheetId: 'oj85vyb',
+    worksheetId: 'oj85vyb',
 
     oauth : {
         email: '1040196767336-6c3it5mah1uvug6kr9tqqlh5e61qrljt@developer.gserviceaccount.com',
