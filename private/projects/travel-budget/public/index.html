@@ -47,6 +47,20 @@ h1 {
     font-size: 0.9em;
 }
 
+.top-bar-shade {
+    color: blue;
+    fill: #ddf;
+}
+
+.header-controls {
+    margin-top: 0.1em;
+    margin-bottom: 0.1em;
+    margin-left: 0.5em;
+    display:inline;
+    float:right;
+}
+
+
     </style>
     <script type='text/javascript'>
     
@@ -167,16 +181,15 @@ function renderExpenses( data ) {
 
     var chart_info = renderDailyAreaChart(rows, 'chart', config);
 
-    $("#vis-radio").change(function () {
-        var checked = $("#vis-radio :radio:checked").attr('id');
-        chart_info.showTop(checked.match(/show/g));
+    $("#show-top").click(function (d) {
+        chart_info.showTop(true);
     });
 }
 
 $( document ).ready(function () {
     console.log('Ready');
     
-    $( "#vis-radio" ).buttonset();
+    $( "#show-top" ).button();
     
     $( "#country" ).change(function () {
         var str = "";
@@ -202,12 +215,10 @@ $( document ).ready(function () {
 
 <div class="header">
     <h1>Travel expenses for <span id="country-name"></span></h1>
-  <div id="vis-radio"  style="display:inline;float:right;">
-    <input type="radio" id="show-top" name="radio"><label for="show-top">Show Top Expenses</label>
-    <input type="radio" id="hide-top" name="radio" checked="checked"><label for="hide-top">Show All Expenses</label>
-  </div>
+    <button id="show-top" class="header-controls">Show Top Expenses</button>
+    
 <!--
-<select id="country" style="display:inline;float:right;">
+<select id="country" class="header-controls">
   <option value="cambodia">Cambodia</option>
   <option value="thailand">Thailand</option>
   <option value="indonesia">Indonesia</option>
@@ -221,9 +232,13 @@ $( document ).ready(function () {
 
 <br clear="both"/>
 
-
 <div id="chart" class="chart"></div>
 
 <div class="footer"></div>
+<svg width="0" height="0">
+    <filter id="blur" x="0" y="0">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
+    </filter>
+</svg>
 </body>
 </html>

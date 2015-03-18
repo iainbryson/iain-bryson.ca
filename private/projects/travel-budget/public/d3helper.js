@@ -6,6 +6,14 @@ d3.helper.tooltip = function (accessor) {
     return function (selection) {
         var tooltipDiv;
         var bodyNode = d3.select('body').node();
+        
+        function isTouchDevice(){
+           return true == ("ontouchstart" in window || window.DocumentTouch && document instanceof DocumentTouch);
+        }
+        
+        // tooltips don't make sense on touch devices.
+        if (isTouchDevice()) return;
+        
         selection.on("mouseover", function (d, i) {
             // Clean up lost tooltips
             d3.select('body').selectAll('div.tooltip').remove();

@@ -15,20 +15,21 @@
   font-size: .8em;
 }
 .series-label {
-  font-size: 1.125em;
+  font-size: 1.425em;
+  line-height: 1.425em;
   @media only screen and (min-width: 768px) {
     /* tablets and desktop */
-  font-size: 1.425em;
+  font-size: 1.825em;
+  line-height: 1.825em;
   }
-  line-height: 1.425em;
 }
 .title-series-label {
-  font-size: 1.425em;
+  font-size: 1.825em;
   @media only screen and (min-width: 768px) {
     /* tablets and desktop */
-  font-size: 2.0em;
+  font-size: 2.5em;
+  line-height: 2.5em;
   }
-  line-height: 2.0em;
 }
 .legend-title {
   font-size: .9em;

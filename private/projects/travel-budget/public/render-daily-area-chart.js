@@ -63,7 +63,7 @@ function renderDailyAreaChart(data, rootElement, config) {
         margin = 50,
         p = 20,
         inner_pad = 20,
-        left_pad = 100,
+        left_pad = 150,
         sampsize = dates.length,
         maxval = d3.max(_.map(dates, function(d) { return date_map[d]; }), function(d) { return d3.sum(d.y); }),
         bottom = h-inner_pad,
@@ -84,7 +84,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                            'color' : color_stacked(i/labels.length),
                            'text'  : descriptions[i] };
         average_stack_data[i][0].legend_item = legend_item[i];
-        average_stack_data[i][0].legend_item.series_label = legend_item[i].name + " $"+average_stack_data[i][0].y.toFixed(2) + " Avg.";
+        average_stack_data[i][0].legend_item.series_label = legend_item[i].name + " $"+average_stack_data[i][0].y.toFixed(2) + "/d";
     }
     
     var bar_stack_y0 = {};
@@ -110,14 +110,14 @@ function renderDailyAreaChart(data, rootElement, config) {
 
     var top_bar_g = chartsvg
                 .append("svg:g")
-                     .datum(0)
+                    .datum(0)
                     .attr("transform", "translate(" + p + "," + p + ")")
                     .attr("id", "topBarsArea")
                     .attr("class", "top-level-graphic");
 
     var vis =   chartsvg
                 .append("svg:g")
-                     .datum(1)
+                    .datum(1)
                     .attr("transform", "translate(" + p + "," + p + ")")
                     .attr("id", "chartArea")
                     .attr("class", "top-level-graphic");
@@ -178,6 +178,15 @@ function renderDailyAreaChart(data, rootElement, config) {
         .classed({ "barrect" : true, "hide" : true });
 
    barRectEnter
+            .call(d3.helper.tooltip(function (d,i) {
+                var bodyNode = d3.select('#chartArea').node();
+                var m = d3.mouse(bodyNode);
+                var date_idx = Math.floor(xScale.invert(m[0]))+1;
+                var date = xScaleDates.invert(m[0]);
+                var tooltip_html = '<div class="tooltip"> '+ d3.time.format('%B %d')(date)  + '<br/>';//<table>';
+                tooltip_html += "" + d.label + " &mdash; $" +  d.y + "</div>";
+                return tooltip_html;
+            }))
             .on('click', function (d, i) {
                 var bodyNode = d3.select('#chartArea').node();
                 var m = d3.mouse(bodyNode);
@@ -188,16 +197,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                 var areachartDialog = $('#'+dialogElementName);
                 areachartDialog.html(dialog_html);
                 areachartDialog.dialog('open');
-            } )/*
-            .call(d3.helper.tooltip(function (d,i) {
-                var bodyNode = d3.select('#chartArea').node();
-                var m = d3.mouse(bodyNode);
-                var date_idx = Math.floor(xScale.invert(m[0]))+1;
-                var date = xScaleDates.invert(m[0]);
-                var tooltip_html = '<div class="tooltip"> '+ d3.time.format('%B %d')(date)  + '<br/>';//<table>';
-                tooltip_html += "" + d.label + " &mdash; $" +  d.y + "</div>";
-                return tooltip_html;
-            }))*/;
+            } );
 
     // define the y axis
     var yAxis = d3.svg.axis()
@@ -278,6 +278,12 @@ function renderDailyAreaChart(data, rootElement, config) {
             .text(function(d)      { return d.legend_item.series_label; })
             .call(titleSeriesLabel);
 
+    top_bar_g.append("svg:rect")
+        .attr('class', "top-bar-shade")
+        .attr("x", -p)
+        .attr("y", -p)
+        .attr('opacity', 0.0);
+    
     var top_bars = top_bar_g.selectAll(".topBars")
         .append("svg:g")
         .data(top_expenses).enter()
@@ -299,13 +305,13 @@ function renderDailyAreaChart(data, rootElement, config) {
 
 
     function resize() {
-        var width = parseInt(d3.select(dom_element).style("width"), 10),
-        height = parseInt(d3.select(dom_element).style("height"), 10);
+        var element_width = parseInt(d3.select(dom_element).style("width"), 10);
+        var element_height = parseInt(d3.select(dom_element).style("height"), 10);
 
         console.log("d3 w" + width + " h " + height);
         
-        height -= margin * 2;
-        width -= margin * 2;
+        var height = element_height - margin * 2;
+        var width  = element_width - margin * 2;
 
         xScale.range([inner_pad, width-left_pad-inner_pad]);
         xScaleDates.range([inner_pad, width-left_pad-inner_pad]);
@@ -362,6 +368,9 @@ function renderDailyAreaChart(data, rootElement, config) {
                 
         vis.selectAll(".topbars")
             .call(topbars);
+        top_bar_g.selectAll(".top-bar-shade")
+            .attr("width", element_width)
+            .attr("height", element_height).attr('filter', 'url(#blur)');
 
         _.each(legend_item, function(d, i) {
             var flat_line =
@@ -423,9 +432,11 @@ function renderDailyAreaChart(data, rootElement, config) {
     
     var showTop = function(show) {
         if (show) {
+            var element_height = parseInt(d3.select(dom_element).style("height"), 10);
+
             chartsvg.selectAll(".top-level-graphic").sort(d3.descending);
             top_bar_g.selectAll(".topbars")
-                .attr('opacity', 10.0)
+                 .attr('opacity', function(d, i) { if (((d.expense_order) * 50 + 40) > (element_height-p)) return 0.0; return 10.0; })
             .transition()
                 .attr("x", (xScale(dates.length) - 400)/2)
                 .attr("y", function(d) { return d.expense_order*50; } )
@@ -434,14 +445,21 @@ function renderDailyAreaChart(data, rootElement, config) {
                 .each("end", function() {
                      vis.selectAll("text.topbars").attr('opacity', 1.0);
                 });
+            vis.selectAll("*").attr('filter', 'url(#blur)');
+            top_bar_g.selectAll("rect.top-bar-shade")
+                    .attr('opacity', 0.0)
+                    .on('click', function(d) { showTop(false); });
         } else {
             chartsvg.selectAll(".top-level-graphic").sort(d3.ascending);
             top_bar_g.selectAll("text.topbars").attr('opacity', 0.0);
             top_bar_g.selectAll(".topbars")
             .transition().call(topbars)
                 .each("end", function() {
+                    vis.selectAll("*").attr('filter', '');
                      top_bar_g.selectAll(".topbars").attr('opacity', 0.0);
                 });
+            top_bar_g.selectAll("rect.top-bar-shade")
+                    .attr('opacity', 0.0);
 
         }
     }
