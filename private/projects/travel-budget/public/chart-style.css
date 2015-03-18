@@ -85,3 +85,7 @@ text.topbars {
     fill: #ddd;
     font-size: 2em;
 }
+
+.hide {
+    opacity: 0.0;
+}

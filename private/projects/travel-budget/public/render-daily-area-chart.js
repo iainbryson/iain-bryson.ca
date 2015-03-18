@@ -107,10 +107,21 @@ function renderDailyAreaChart(data, rootElement, config) {
                     .attr("class", "chartsvg")
                     .attr("width", w + p * 2)
                     .attr("height", h + p * 2);
+
+    var top_bar_g = chartsvg
+                .append("svg:g")
+                     .datum(0)
+                    .attr("transform", "translate(" + p + "," + p + ")")
+                    .attr("id", "topBarsArea")
+                    .attr("class", "top-level-graphic");
+
     var vis =   chartsvg
                 .append("svg:g")
+                     .datum(1)
                     .attr("transform", "translate(" + p + "," + p + ")")
-                    .attr("id", "chartArea");
+                    .attr("id", "chartArea")
+                    .attr("class", "top-level-graphic");
+
 
     var dialogElementName = rootElement+'Dialog';
     $('#'+rootElement).append("<div id='"+dialogElementName+"'/>");
@@ -126,17 +137,6 @@ function renderDailyAreaChart(data, rootElement, config) {
 
     buildGradients(vis, labels.length, 'gradient');
 
-    var barrect = function(g) {
-        g.each(function() {
-            var g = d3.select(this);
-            g
-                .attr("width", (xScale(1)-xScale(0)) * 0.80 )
-                .attr("y", function(d) { return yScale(d.y0+d.y); })
-                .attr("x", function(d) { return xScale(d.x); })
-                .attr("height", function(d) { return Math.abs(yScale(0) - yScale(d.y)); });
-        });
-    };
-    
     var topbars = function(g) {
 
 //g.each(function() {
@@ -167,15 +167,17 @@ function renderDailyAreaChart(data, rootElement, config) {
         } );
     };
 
-    vis.selectAll(".barChart")
+    var barCategoryEnter = vis.selectAll(".barChart")
         .data(stack_layout_data).enter()
         .append("svg:g")
-            .style("fill", function(d,i) { return legend_item[i % legend_item.length].color; })
-            .selectAll(".bars")
+            .style("fill", function(d,i) { return legend_item[i % legend_item.length].color; });
+            
+    var barRectEnter = barCategoryEnter.selectAll(".barrect")
         .data(function(d) { return d; }).enter()
         .append("rect")
-            .attr("class", "barrect")
-            .call(barrect)
+        .classed({ "barrect" : true, "hide" : true });
+
+   barRectEnter
             .on('click', function (d, i) {
                 var bodyNode = d3.select('#chartArea').node();
                 var m = d3.mouse(bodyNode);
@@ -186,7 +188,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                 var areachartDialog = $('#'+dialogElementName);
                 areachartDialog.html(dialog_html);
                 areachartDialog.dialog('open');
-            } )
+            } )/*
             .call(d3.helper.tooltip(function (d,i) {
                 var bodyNode = d3.select('#chartArea').node();
                 var m = d3.mouse(bodyNode);
@@ -195,7 +197,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                 var tooltip_html = '<div class="tooltip"> '+ d3.time.format('%B %d')(date)  + '<br/>';//<table>';
                 tooltip_html += "" + d.label + " &mdash; $" +  d.y + "</div>";
                 return tooltip_html;
-            }));
+            }))*/;
 
     // define the y axis
     var yAxis = d3.svg.axis()
@@ -226,7 +228,7 @@ function renderDailyAreaChart(data, rootElement, config) {
     var line_fcn = function(legend_item_num) { return d3.svg.line()
             .interpolate(movingAvg(3))
             .x(function(d) { return xScale(d.x); })
-            .y(function(d,i) { return yScale(d.y+d.y0); })(stack_layout_data[legend_item_num]);
+            .y(function(d) { return yScale(d.y+d.y0); })(stack_layout_data[legend_item_num]);
             };
     
     var data_series = vis
@@ -276,9 +278,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             .text(function(d)      { return d.legend_item.series_label; })
             .call(titleSeriesLabel);
 
-
-
-    var top_bars = vis.selectAll(".topBars")
+    var top_bars = top_bar_g.selectAll(".topBars")
         .append("svg:g")
         .data(top_expenses).enter()
         .append("svg:g");
@@ -348,14 +348,35 @@ function renderDailyAreaChart(data, rootElement, config) {
         vis.select('.yaxis')
            .call(yAxis);
 
-        vis.selectAll(".barrect")
-           .call(barrect);
-
+        vis.selectAll("rect.barrect")
+                .classed({"barrect": true, "hide" : false})
+                .attr("y", function(d) { return yScale(0); })
+                .attr("height", 0)
+                .transition()
+                    .duration(1000)
+                        .attr("width", (xScale(1)-xScale(0)) * 0.80 )
+                        .attr("y", function(d) { return yScale(d.y0+d.y); })
+                        .attr("x", function(d) { return xScale(d.x); })
+                        .attr("height", function(d) { return Math.abs(yScale(0) - yScale(d.y)); });
+                
+                
         vis.selectAll(".topbars")
             .call(topbars);
 
         _.each(legend_item, function(d, i) {
-            vis.selectAll(".series"+i).attr("d", lines[i]());
+            var flat_line =
+                d3.svg.line()
+                    .interpolate(movingAvg(3))
+                    .x(function(d) { return xScale(d.x); })
+                    .y(yScale(0))
+                        (stack_layout_data[i]);
+                        
+            vis.selectAll(".series"+i)
+                .attr("d", flat_line )
+                .transition()
+                    .duration(1000)
+                .attr("d", lines[i]());
+                console.log(lines[i]());
         } );
         
         var foci = [], labels=[];
@@ -402,7 +423,8 @@ function renderDailyAreaChart(data, rootElement, config) {
     
     var showTop = function(show) {
         if (show) {
-            vis.selectAll(".topbars")
+            chartsvg.selectAll(".top-level-graphic").sort(d3.descending);
+            top_bar_g.selectAll(".topbars")
                 .attr('opacity', 10.0)
             .transition()
                 .attr("x", (xScale(dates.length) - 400)/2)
@@ -413,11 +435,12 @@ function renderDailyAreaChart(data, rootElement, config) {
                      vis.selectAll("text.topbars").attr('opacity', 1.0);
                 });
         } else {
-            vis.selectAll("text.topbars").attr('opacity', 0.0);
-            vis.selectAll(".topbars")
+            chartsvg.selectAll(".top-level-graphic").sort(d3.ascending);
+            top_bar_g.selectAll("text.topbars").attr('opacity', 0.0);
+            top_bar_g.selectAll(".topbars")
             .transition().call(topbars)
                 .each("end", function() {
-                     vis.selectAll(".topbars").attr('opacity', 0.0);
+                     top_bar_g.selectAll(".topbars").attr('opacity', 0.0);
                 });
 
         }

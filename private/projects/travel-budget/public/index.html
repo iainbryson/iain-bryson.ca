@@ -34,9 +34,17 @@ html {
 h1 {
     display:inline;
     margin-top: 0.1em;
+    margin-bottom: 0.1em;
     margin-left: 0.5em;
     float: left;
     font-weight: 200;
+}
+
+.instructions {
+    color: #777;
+    margin-left: 1.5em;
+    float: left;
+    font-size: 0.9em;
 }
 
     </style>
@@ -191,14 +199,13 @@ $( document ).ready(function () {
 
 </head>
 <body>
+
 <div class="header">
-<h1>Travel expenses for <span id="country-name"></span></h1>
+    <h1>Travel expenses for <span id="country-name"></span></h1>
   <div id="vis-radio"  style="display:inline;float:right;">
     <input type="radio" id="show-top" name="radio"><label for="show-top">Show Top Expenses</label>
     <input type="radio" id="hide-top" name="radio" checked="checked"><label for="hide-top">Show All Expenses</label>
   </div>
-</div>
-
 <!--
 <select id="country" style="display:inline;float:right;">
   <option value="cambodia">Cambodia</option>
@@ -206,8 +213,15 @@ $( document ).ready(function () {
   <option value="indonesia">Indonesia</option>
 </select>
 -->
+<br clear="both"/>
+<div class="instructions">Click on bars for details.</div>
+</div>
+
+
 
 <br clear="both"/>
+
+
 <div id="chart" class="chart"></div>
 
 <div class="footer"></div>
