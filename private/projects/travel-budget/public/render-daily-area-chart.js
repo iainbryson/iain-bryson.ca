@@ -37,22 +37,28 @@ function renderDailyAreaChart(data, rootElement, config) {
                   y :       date_map[dates[date_idx]].y[i],
                   details : date_map[dates[date_idx]].details[i]
             }
+            console.assert(!isNaN(el.y));
             raw_expenses.push(el);
             stack_data[i].push(el);
         }
     }
     
-    _.each(raw_data, function(d) { d.x = reverse_dates[d.x]; d.label = labels[d.category_idx]; });
+    _.each(raw_data, function(d) { d.x = reverse_dates[d.Date]; d.label = labels[d.category_idx]; });
     var sorted_expenses = raw_data.sort(function(lhs, rhs) { return rhs.y > lhs.y ? 1 : (rhs.y < lhs.y ? -1 : 0) });
     var top_expenses = sorted_expenses.slice(0, 10);
     
     _.each(top_expenses, function(d, i) { d.expense_order = i; });
     
     var average_stack_data = [];
+    var spent_labels = [];
     _.each(labels, function(d, i) {
-        average_stack_data.push([ { label : labels[i],
-                                    x :     dates.length,
-                                    y :     d3.sum(dates, function(d) { return date_map[d].y[i]; }) / dates.length }]);
+        var avg = [ { label : labels[i],
+                x :     dates.length,
+                y :     d3.sum(dates, function(d) { return date_map[d].y[i]; }) / dates.length }];
+        if (avg[0].y > 0) {
+            average_stack_data.push(avg);
+            spent_labels.push(labels[i]);
+        };
     } );
 
     var stack_layout_data = d3.layout.stack().offset(0)(stack_data);
@@ -77,11 +83,11 @@ function renderDailyAreaChart(data, rootElement, config) {
 
     var color_stacked = defaultColors();
 
-    var legend_item = new Array(labels.length);
+    var legend_item = new Array(spent_labels.length);
 
-    for (i = 0; i < labels.length; i++) {
-        legend_item[i] = { 'name'  : labels[i],
-                           'color' : color_stacked(i/labels.length),
+    for (i = 0; i < spent_labels.length; i++) {
+        legend_item[i] = { 'name'  : spent_labels[i],
+                           'color' : color_stacked(i/spent_labels.length),
                            'text'  : descriptions[i] };
         average_stack_data[i][0].legend_item = legend_item[i];
         average_stack_data[i][0].legend_item.series_label = legend_item[i].name + " $"+average_stack_data[i][0].y.toFixed(2) + "/d";
@@ -138,15 +144,13 @@ function renderDailyAreaChart(data, rootElement, config) {
     buildGradients(vis, labels.length, 'gradient');
 
     var topbars = function(g) {
-
-//g.each(function() {
-  //          var g = d3.select(this);
             g
                 .attr("width", (xScale(1)-xScale(0)) * 0.80 )
-                .attr("y", function(d) { return yScale(bar_stack_y0[d.category_idx][d.x]+d.y); })
+                .attr("y", function(d) {
+                        console.assert( !isNaN(yScale(bar_stack_y0[d.category_idx][d.x])));
+                        return yScale(bar_stack_y0[d.category_idx][d.x]+d.y); })
                 .attr("x", function(d) { return xScale(d.x); })
                 .attr("height", function(d) { return Math.abs(yScale(0) - yScale(d.y)); });
-    //    });
     }
     
     var seriesLabel = function(g) {
@@ -154,7 +158,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             var g = d3.select(this);
             g
                 .attr("x", function(d) { return xScale(d.x); })
-                .attr("y", function(d) { return yScale(d.y); });
+                .attr("y", function(d) { return yScale(d.y + d.y0 + d.y_offset); });
         } );
     };
 
@@ -163,7 +167,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             var g = d3.select(this);
             g
                 .attr("x", function(d) { return xScale(d.x); })
-                .attr("y", function(d) { return yScale(yExtent[1]*0.8); });
+                .attr("y", function(d) { return yScale(yScale.domain()[1] + yScale.invert(0) - yScale.invert(0)); });
         } );
     };
 
@@ -184,7 +188,7 @@ function renderDailyAreaChart(data, rootElement, config) {
                 var date_idx = Math.floor(xScale.invert(m[0]))+1;
                 var date = xScaleDates.invert(m[0]);
                 var tooltip_html = '<div class="tooltip"> '+ d3.time.format('%B %d')(date)  + '<br/>';//<table>';
-                tooltip_html += "" + d.label + " &mdash; $" +  d.y + "</div>";
+                tooltip_html += "" + d.label + " &mdash; $" +  d.y.toFixed(2) + "</div>";
                 return tooltip_html;
             }))
             .on('click', function (d, i) {
@@ -223,12 +227,17 @@ function renderDailyAreaChart(data, rootElement, config) {
         .attr("transform", "translate(0," + (h - inner_pad) + ")")
         .call(xAxis);
 
+    // create line data by taking the series data and appending an average value to line up with the series label
+    var series_label_line_data = [];
+    _.each(stack_layout_data, function(d) { series_label_line_data.push(d); } );
+    _.each(average_layout_data, function(d,i) { series_label_line_data[i].push(d[0]) } );
+
     var lines = [];
     var averages = [];
-    var line_fcn = function(legend_item_num) { return d3.svg.line()
-            .interpolate(movingAvg(3))
+    var line_fcn = function(legend_item_num, data) { return d3.svg.line()
+            .interpolate('basis')//movingAvg(3))
             .x(function(d) { return xScale(d.x); })
-            .y(function(d) { return yScale(d.y+d.y0); })(stack_layout_data[legend_item_num]);
+            .y(function(d) { return yScale(d.y+d.y0); })(data[legend_item_num]);
             };
     
     var data_series = vis
@@ -244,26 +253,36 @@ function renderDailyAreaChart(data, rootElement, config) {
             .attr("fill", "none")
             .attr("class", "chart-line series" + legend_item_num)
             .attr("stroke", function(d,i) { return d3.rgb(legend_item[legend_item_num].color).toString(); })
-            .attr("d", line());
+            .attr("d", line(series_label_line_data));
     }
 
    var series_label = vis
         .append("svg:g")
         .selectAll(".series-label");
         
-    var series_label_data = $.map(average_layout_data, function (d) { d[0].y += d[0].y0; return d; })
+    var series_label_data = $.map(average_layout_data, function (d) {
+            var dnew = jQuery.extend({}, d[0]);
+            dnew.y_offset = 0;
+            dnew.class = "series-label";
+            return dnew; });
     var last_series_label = series_label_data[series_label_data.length-1];
     
-    var titles_data = [({x: series_label_data[series_label_data.length-1].x, y: yScale.invert(40), legend_item : { series_label: "Daily Average $"+last_series_label.y.toFixed(2) }})];
+    // TODO: add title datum to the series to handle both with the same code
+    var titles_data = [({x: series_label_data[series_label_data.length-1].x,
+                         y: last_series_label.y,
+                         legend_item : { series_label: "Daily Average $" + (last_series_label.y + last_series_label.y0).toFixed(2) },
+                         class: "title-series-label"
+                         })];
     
    series_label
         .data(series_label_data)
         .enter()
             .append("svg:text")
-            .attr("class", "series-label")
+            .attr("class", function(d) { return d.class; })
+            .attr("dx", "5")
             .attr("text-anchor", "start")
             .attr("alignment-baseline", "middle")
-            .text(function(d)      { return d.legend_item.series_label; })
+            .text(function(d)           { return d.legend_item.series_label; })
             .call(seriesLabel);
 
    var titles = vis
@@ -272,7 +291,7 @@ function renderDailyAreaChart(data, rootElement, config) {
         .data(titles_data)
         .enter()
             .append("svg:text")
-            .attr("class", "title-series-label")
+            .attr("class", function(d) { return d.class; })
             .attr("text-anchor", "start")
             .attr("alignment-baseline", "middle")
             .text(function(d)      { return d.legend_item.series_label; })
@@ -304,14 +323,18 @@ function renderDailyAreaChart(data, rootElement, config) {
         .attr('opacity', 0);
 
 
-    function resize() {
+    function getElementSize() {
         var element_width = parseInt(d3.select(dom_element).style("width"), 10);
         var element_height = parseInt(d3.select(dom_element).style("height"), 10);
-
-        console.log("d3 w" + width + " h " + height);
         
-        var height = element_height - margin * 2;
-        var width  = element_width - margin * 2;
+        return [ element_width, element_height ];
+    }
+    
+    function resize() {
+        var element_size = getElementSize();
+
+        var height = element_size[1] - margin * 2;
+        var width  = element_size[0] - margin * 2;
 
         xScale.range([inner_pad, width-left_pad-inner_pad]);
         xScaleDates.range([inner_pad, width-left_pad-inner_pad]);
@@ -369,60 +392,77 @@ function renderDailyAreaChart(data, rootElement, config) {
         vis.selectAll(".topbars")
             .call(topbars);
         top_bar_g.selectAll(".top-bar-shade")
-            .attr("width", element_width)
-            .attr("height", element_height).attr('filter', 'url(#blur)');
+            .attr("width", element_size[0])
+            .attr("height", element_size[1]).attr('filter', 'url(#blur)');
 
-        _.each(legend_item, function(d, i) {
-            var flat_line =
-                d3.svg.line()
-                    .interpolate(movingAvg(3))
-                    .x(function(d) { return xScale(d.x); })
-                    .y(yScale(0))
-                        (stack_layout_data[i]);
-                        
-            vis.selectAll(".series"+i)
-                .attr("d", flat_line )
-                .transition()
-                    .duration(1000)
-                .attr("d", lines[i]());
-                console.log(lines[i]());
+        // Tweak the positions of the series labels so that:
+        // (1) they're as close as possible to their "true" position — the average value of the spending category
+        // (2) they don't overlap
+        // (3) they don't run off the end of the chart
+        _.each(series_label_data, function(d, i) { d.y_offset = 0; } );
+        
+        var label_y_range = Math.abs(d3.max(series_label_data, function(d) { return d.y; } ) - d3.min(series_label_data, function(d) { return d.y; } ) );
+
+        vis.selectAll(".series-label").each(function(d) {
+            var n = d3.select(this);
+            d.bbox = n.node().getBoundingClientRect();
+        });
+        
+        // check if we need to shift (skew) the labels downward to fit them all in the height we have available
+        var skew = (Math.abs(yScale.invert((series_label_data[0].bbox.height + 5)* series_label_data.length))  - yScale.invert(0)) - label_y_range;
+
+        var bottom_skew = 0;
+        if (skew > 0) {
+            // not enough room to align both top and bottom series labels, so we have to skew them up and down
+            if (series_label_data[0].y - (skew / 2) < 0) {
+                // we can't skew as much as we'd like to the bottom, but go as far as possible
+                bottom_skew = series_label_data[0].y;
+            } else {
+                // we have enough space to skew as much as we need and not hit the bottom of the chart
+                bottom_skew = skew/2;
+            }
+
+            _.each(series_label_data, function(d) { d.y_offset -= bottom_skew; } );
+        } else {
+            skew = 0;
+        }
+        
+        // prevent overlap between the labels
+        _.each(series_label_data, function(d, i) {
+        
+            if (i > 0) {
+                var line_height = Math.abs(yScale.invert(series_label_data[i-1].bbox.height + 5) - yScale.invert(0));
+
+                var y = d.y + d.y0 + d.y_offset;
+                var y_prev = series_label_data[i-1].y + series_label_data[i-1].y0 + series_label_data[i-1].y_offset;
+                if (y < (y_prev + line_height)) {
+                    d.y_offset += (y_prev + line_height) - y;
+                }
+            }
         } );
         
-        var foci = [], labels=[];
-        
-        series_label_data.forEach(function(d, i) {
-            foci.push({x: d.x, y: d.y});
-        });
-
-        // Create the force layout with a slightly weak charge
-        var force = d3.layout.force()
-            .nodes(series_label_data)
-            .charge(-20)
-            .chargeDistance(7)
-            .gravity(0)
-            .size([width, height]);
-
-        force.on("tick", function(e) {
-            console.log('tick');
-            var k = .1 * e.alpha;
-            series_label_data.forEach(function(o, j) {
-                // The change in the position is proportional to the distance
-                // between the label and the corresponding place (foci)
-                o.y += (foci[j].y - o.y) * k;
-                //o.x += (foci[j].x - o.x) * k;
-            });
-
-            // Update the position of the text element
-            vis.selectAll(".series-label")
-               .call(seriesLabel);
-        });
-
         vis.selectAll(".series-label")
            .call(seriesLabel);
         vis.selectAll(".title-series-label")
            .call(titleSeriesLabel);
 
-        force.start();
+        // join up the series lines with the new position of the labels
+        _.each(series_label_data, function(d, i) { series_label_line_data[i][series_label_line_data[i].length-1].y = d.y + d.y_offset; } );
+
+        _.each(legend_item, function(d, i) {
+            var flat_line =
+                d3.svg.line()
+                    .interpolate('basis')
+                    .x(function(d) { return xScale(d.x); })
+                    .y(yScale(0))
+                        (stack_layout_data[i]);
+                        
+            vis.selectAll(".series"+i)
+                .attr( "d", flat_line )
+                .transition()
+                    .duration(1000)
+                .attr( "d", lines[i](series_label_line_data) );
+        } );
 
     }
 
@@ -431,17 +471,22 @@ function renderDailyAreaChart(data, rootElement, config) {
     resize();
     
     var showTop = function(show) {
+        "use strict";
+        
         if (show) {
-            var element_height = parseInt(d3.select(dom_element).style("height"), 10);
+            var element_size = getElementSize();
+            var bar_width = 400;
+            var bar_height = 40;
+            var bar_margin = 10;
 
             chartsvg.selectAll(".top-level-graphic").sort(d3.descending);
             top_bar_g.selectAll(".topbars")
-                 .attr('opacity', function(d, i) { if (((d.expense_order) * 50 + 40) > (element_height-p)) return 0.0; return 10.0; })
+                 .attr('opacity', function(d, i) { if (((d.expense_order) * (bar_height + bar_margin) + bar_height) > (element_size[1]-p)) return 0.0; return 10.0; })
             .transition()
-                .attr("x", (xScale(dates.length) - 400)/2)
-                .attr("y", function(d) { return d.expense_order*50; } )
-                .attr("height", 40 )
-                .attr("width", 400)
+                .attr("x", (element_size[0] - bar_width)/2)
+                .attr("y", function(d) { return d.expense_order*(bar_height + bar_margin); } )
+                .attr("height", bar_height )
+                .attr("width", bar_width )
                 .each("end", function() {
                      vis.selectAll("text.topbars").attr('opacity', 1.0);
                 });
@@ -460,7 +505,6 @@ function renderDailyAreaChart(data, rootElement, config) {
                 });
             top_bar_g.selectAll("rect.top-bar-shade")
                     .attr('opacity', 0.0);
-
         }
     }
     

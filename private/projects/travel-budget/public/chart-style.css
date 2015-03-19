@@ -15,6 +15,7 @@
   font-size: .8em;
 }
 .series-label {
+  dx: .5em;
   font-size: 1.425em;
   line-height: 1.425em;
   @media only screen and (min-width: 768px) {

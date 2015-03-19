@@ -67,9 +67,7 @@ movingAvg = function(n) {
         avg = points.map(function(d) { return d[1]; }).reduce(function(a,b) {return a+b;}) / points.length;
         
         ma_points = ma_points.filter(function(each) { return typeof each !== 'undefined' });
-        ma_points.push([points[points.length-1][0], avg]);//ma_points[ma_points.length-1][1]]);
-// TODO: move this part out
-        ma_points.push([points[points.length-1][0]+(points[points.length-1][0]-points[points.length-2][0])*0.8, avg]);
+        
         // Transform the points into a basis line
         pathDesc = d3.svg.line().interpolate("basis")(ma_points)
         // Remove the extra "M"

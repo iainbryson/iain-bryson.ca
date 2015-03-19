@@ -60,10 +60,15 @@ h1 {
     float:right;
 }
 
+select {
+    font-size: 8.0em;
+}
+
 
     </style>
     <script type='text/javascript'>
-    
+
+$.GLOBALS = { };
     
 function cost(row) {
     "use strict";
@@ -72,14 +77,17 @@ function cost(row) {
         'CAD' : 0.8,
         'KHR' : 0.00025,
         'IDR' : 0.00008333333333,
+        'THB' : 0.033333,
         'USD' : 1,
         'EUR' : 1.2,
     };
     
-    return exchange_rates[row["Currency"]] * row["Cash Cost"];
+    var cash = row["Cash Cost"];
+    if (isNaN(cash)) cash = 0.0;
+    return exchange_rates[row["Currency"]] * cash;
 }
 
-function normalizeSheetRows( rows ) {
+function transformRows( rows ) {
 
     h = rows[1];
     
@@ -103,6 +111,7 @@ function normalizeSheetRows( rows ) {
                 if (rows[row].hasOwnProperty(col)) {
                     if (typeof(rows[row][col]) == typeof(undefined)) {
                         skip_row = true;
+                        break;
                     }
                 }
             }
@@ -121,83 +130,132 @@ function normalizeSheetRows( rows ) {
         }
     }
     
-    normalized_rows = normalized_rows.filter(function(d) { return d != undefined });
+    return normalized_rows.filter(function(d) { return d != undefined });
+}
 
-    categories = _.uniq(normalized_rows.map(function(d) { if (d) return d.Category; }));
-    
-    category_map = {};
-    for (var i = 0; i < categories.length; i++) {  category_map[categories[i]] = i; };
-    
-    console.log(categories);
-    
-    _.each(normalized_rows, function(d) {
-        d.y = cost(d);
-        d.x = d.Date;
-        d.category_idx = category_map[d.Category];
-        d.detail = d.Item + " — $" + cost(d);
-    });
-    
-    nested = d3.nest().key(function(d) { return d.Date; })
+function buildChartData(filterFcn) {
+    "use strict";
+
+    var normalized_rows = _.filter($.GLOBALS.normalized_rows, filterFcn);
+
+    var nested = d3.nest().key(function(d) { return d.Date; })
              .rollup(function(leaves) {
-                     y = Array.apply(null, new Array(categories.length)).map(Number.prototype.valueOf, 0);
-                     details = Array.apply(null, new Array(categories.length)).map(String.prototype.valueOf, "");
-                     _.each(leaves, function(d) { y[category_map[d.Category]] += cost(d);
-                     details[category_map[d.Category]] += "<li>" + d.Item + " &mdash; $" + cost(d) + "</li>"});
-                    return {"y":y, 'details':details } })
+                     var y = Array.apply(null, new Array($.GLOBALS.categories.length)).map(Number.prototype.valueOf, 0);
+                     var details = Array.apply(null, new Array($.GLOBALS.categories.length)).map(String.prototype.valueOf, "");
+                     _.each(leaves, function(d) { y[$.GLOBALS.category_map[d.Category]] += cost(d);
+                     details[$.GLOBALS.category_map[d.Category]] += "<li>" + d.Item + " &mdash; $" + cost(d).toFixed(2) + "</li>"});
+                    return { "y": y, 'details': details };
+              })
              .entries(normalized_rows);
 
-    data = {};
+    var data = {};
     data.date_map = {};
     _.each(nested, function(d) { d.y = d.values.y; d.details = d.values.details; data.date_map[d.key] = d; } );
-    data.legend_labels = categories;
-    data.details = categories;
+    data.legend_labels = $.GLOBALS.categories;
+    data.details = $.GLOBALS.categories;
     data.title = "Travel Expenses";
     data.raw = normalized_rows;
     
     return data;
 }
 
+function normalizeSheetRows( rows ) {
+    "use strict";
+
+    $.GLOBALS.normalized_rows = transformRows(rows);
+
+    $.GLOBALS.categories = _.uniq($.GLOBALS.normalized_rows.map(function(d) { if (d) return d.Category; }));
+
+    $.GLOBALS.countries = _.uniq($.GLOBALS.normalized_rows.map(function(d) { if (d) return d.Country; }));
+    
+    $.GLOBALS.category_map = {};
+    for (var i = 0; i < $.GLOBALS.categories.length; i++) {
+        $.GLOBALS.category_map[$.GLOBALS.categories[i]] = i;
+    };
+    
+    $.GLOBALS.current_country = $.GLOBALS.countries[0];
+    
+    if ($.GLOBALS.countries.length > 1) {
+        _.each($.GLOBALS.countries, function(d) {
+        var option = '<option value="' + d.toLowerCase() + '">' + d + '</option>';
+        $( '#country' ).append(option); });
+        
+        var selectMenu = $( '#country' ).selectmenu( { width: "200" } );
+        
+        selectMenu.selectmenu( 'widget' ).addClass('header-controls');
+        
+         selectMenu.selectmenu( { 'change': function () {
+            var str = "";
+            $( "select option:selected" ).each(function() {
+                str = $( this ).text();
+            });
+        
+            console.log(str);
+        
+            $.GLOBALS.current_country = str;
+        
+            var chart_data = buildChartData(function(d) { return d.Country == $.GLOBALS.current_country; } );
+    
+            renderChart( chart_data );
+        } } );
+
+    } else {
+        $( '#country' ).css('display', 'none');
+    }
+    
+    _.each($.GLOBALS.normalized_rows, function(d) {
+        d.y = cost(d);
+        d.x = d.Date;
+        d.category_idx = $.GLOBALS.category_map[d.Category];
+        d.detail = d.Item + " — $" + cost(d).toFixed(2);
+    });
+    
+    var data = buildChartData(function(d) { return d.Country == $.GLOBALS.current_country; } );
+    
+    return data;
+}
+
 function renderExpenses( data ) {
-    var rows = normalizeSheetRows( data.rows );
+    var chart_data = normalizeSheetRows( data.rows );
     
-    $('#country-name').text('Cambodia');
+    renderChart( chart_data );
+}
+
+function renderChart( chart_data ) {
+    "use strict";
     
-    console.log(rows);
+    $('#country-name').text($.GLOBALS.current_country);
     
-    config = {
-    width : 600,
-    height: 300,
-    tables_max_rows: 500,
+    var config = {
+        width : 600,
+        height: 300,
+        tables_max_rows: 500,
 
-    chart_color_range_start : "#0849b3",
-    chart_color_range_start : "#b34908",
-    chart_colors : ["#c6dbef", "#9ecae1", "#6baed6"],
-    xaxis_label_angle : -50,
-    axis_label_font_size : 12,
-    axis_label_date_length : 7,
-    axis_label_date_format : d3.time.format("%d %b"),
-    min_tick_width: 30,
-};
+        chart_color_range_start : "#0849b3",
+        chart_colors : ["#c6dbef", "#9ecae1", "#6baed6"],
+        xaxis_label_angle : -50,
+        axis_label_font_size : 12,
+        axis_label_date_length : 7,
+        axis_label_date_format : d3.time.format("%d %b"),
+        min_tick_width: 30,
+    };
 
-    var chart_info = renderDailyAreaChart(rows, 'chart', config);
+    $( '#chart' ).empty();
 
-    $("#show-top").click(function (d) {
+    var chart_info = renderDailyAreaChart(chart_data, 'chart', config);
+
+    $( '#show-top' ).click(function (d) {
         chart_info.showTop(true);
     });
 }
 
 $( document ).ready(function () {
+    "use strict";
+
     console.log('Ready');
     
     $( "#show-top" ).button();
     
-    $( "#country" ).change(function () {
-        var str = "";
-        $( "select option:selected" ).each(function() {
-            str += $( this ).text() + " ";
-        });
-        console.log(str);
-    })
     var expenses = $.ajax({
         url: '/data',
         dataType: 'json'
@@ -217,13 +275,9 @@ $( document ).ready(function () {
     <h1>Travel expenses for <span id="country-name"></span></h1>
     <button id="show-top" class="header-controls">Show Top Expenses</button>
     
-<!--
 <select id="country" class="header-controls">
-  <option value="cambodia">Cambodia</option>
-  <option value="thailand">Thailand</option>
-  <option value="indonesia">Indonesia</option>
 </select>
--->
+
 <br clear="both"/>
 <div class="instructions">Click on bars for details.</div>
 </div>
