@@ -215,17 +215,15 @@ function renderDailyAreaChart(data, rootElement, config) {
         .scale(xScaleDates)
         .tickFormat(config.axis_label_date_format);
 
+
     // draw y axis with labels and move in from the size by the amount of padding
     vis.append("g")
         .attr("class", "yaxis axis")
-        .attr("transform", "translate(" + inner_pad + ",0)")
-        .call(yAxis);
+        .attr("transform", "translate(" + inner_pad + ",0)");
 
     // draw x axis with labels and move to the bottom of the chart area
     vis.append("g")
-        .attr("class", "xaxis axis")  // two classes, one for css formatting, one for selection below
-        .attr("transform", "translate(0," + (h - inner_pad) + ")")
-        .call(xAxis);
+        .attr("class", "xaxis axis");  // two classes, one for css formatting, one for selection below
 
     // create line data by taking the series data and appending an average value to line up with the series label
     var series_label_line_data = [];
@@ -252,8 +250,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             .append("path")
             .attr("fill", "none")
             .attr("class", "chart-line series" + legend_item_num)
-            .attr("stroke", function(d,i) { return d3.rgb(legend_item[legend_item_num].color).toString(); })
-            .attr("d", line(series_label_line_data));
+            .attr("stroke", function(d,i) { return d3.rgb(legend_item[legend_item_num].color).toString(); });
     }
 
    var series_label = vis
@@ -282,8 +279,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             .attr("dx", "5")
             .attr("text-anchor", "start")
             .attr("alignment-baseline", "middle")
-            .text(function(d)           { return d.legend_item.series_label; })
-            .call(seriesLabel);
+            .text(function(d)           { return d.legend_item.series_label; });
 
    var titles = vis
           .append("svg:g")
@@ -294,8 +290,7 @@ function renderDailyAreaChart(data, rootElement, config) {
             .attr("class", function(d) { return d.class; })
             .attr("text-anchor", "start")
             .attr("alignment-baseline", "middle")
-            .text(function(d)      { return d.legend_item.series_label; })
-            .call(titleSeriesLabel);
+            .text(function(d)      { return d.legend_item.series_label; });
 
     top_bar_g.append("svg:rect")
         .attr('class', "top-bar-shade")
@@ -318,7 +313,7 @@ function renderDailyAreaChart(data, rootElement, config) {
         .attr("class", "topbars")
         .text(function(d) { return d.detail; } )
         .call(topbars)
-        .attr("dy", "1.5em")
+        .attr("dy", "5px")
         .attr("dx", "0.5em")
         .attr('opacity', 0);
 
@@ -393,8 +388,9 @@ function renderDailyAreaChart(data, rootElement, config) {
             .call(topbars);
         top_bar_g.selectAll(".top-bar-shade")
             .attr("width", element_size[0])
-            .attr("height", element_size[1]).attr('filter', 'url(#blur)');
-
+            .attr("height", element_size[1])
+            .attr('opacity', 0.0);
+            
         // Tweak the positions of the series labels so that:
         // (1) they're as close as possible to their "true" position — the average value of the spending category
         // (2) they don't overlap
@@ -474,37 +470,53 @@ function renderDailyAreaChart(data, rootElement, config) {
         "use strict";
         
         if (show) {
+            // show the top expenses.
+            
             var element_size = getElementSize();
             var bar_width = 400;
             var bar_height = 40;
-            var bar_margin = 10;
+            var bar_margin = { x: 10, y: 5 };
+            var bar_padding = 10;
 
+            var text_bboxes = [];
+            top_bar_g.selectAll("text.topbars").each(function(d) { text_bboxes.push( d3.select(this).node().getBoundingClientRect() ); });
+            
+            var max_text_width = d3.max(text_bboxes.map(function(d) { return d.width; }));
+            var max_text_height = d3.max(text_bboxes.map(function(d) { return d.height; }));
+
+            bar_width  = max_text_width  + bar_margin.x * 2;
+            bar_height = max_text_height + bar_margin.y * 2;
+            
+            // bring top expenses visualization to the foreground
             chartsvg.selectAll(".top-level-graphic").sort(d3.descending);
+            
+            // make the top expense bars opaque then transition them to their new sizes
             top_bar_g.selectAll(".topbars")
-                 .attr('opacity', function(d, i) { if (((d.expense_order) * (bar_height + bar_margin) + bar_height) > (element_size[1]-p)) return 0.0; return 10.0; })
+                 .attr('opacity', function(d, i) { if (((d.expense_order) * (bar_height + bar_padding) + bar_height) > (element_size[1]-p)) return 0.0; return 10.0; })
             .transition()
                 .attr("x", (element_size[0] - bar_width)/2)
-                .attr("y", function(d) { return d.expense_order*(bar_height + bar_margin); } )
+                .attr("y", function(d) { return d.expense_order*(bar_height + bar_padding); } )
                 .attr("height", bar_height )
-                .attr("width", bar_width )
-                .each("end", function() {
-                     vis.selectAll("text.topbars").attr('opacity', 1.0);
-                });
-            vis.selectAll("*").attr('filter', 'url(#blur)');
+                .attr("width", bar_width );
+                
+            top_bar_g.selectAll("text.topbars").attr("dy", function(d) { return (max_text_height + bar_margin.y) + "px" } );
+            
+            // blur the background
+            vis.selectAll("*").transition().attr('filter', 'url(#blur)');
+            
+            // make any click on the top bar shade move us out of this mode.
             top_bar_g.selectAll("rect.top-bar-shade")
-                    .attr('opacity', 0.0)
                     .on('click', function(d) { showTop(false); });
         } else {
+            // hide the top expenses
+            
             chartsvg.selectAll(".top-level-graphic").sort(d3.ascending);
             top_bar_g.selectAll("text.topbars").attr('opacity', 0.0);
             top_bar_g.selectAll(".topbars")
-            .transition().call(topbars)
+            .transition().attr('opacity', 0.0).call(topbars)
                 .each("end", function() {
                     vis.selectAll("*").attr('filter', '');
-                     top_bar_g.selectAll(".topbars").attr('opacity', 0.0);
                 });
-            top_bar_g.selectAll("rect.top-bar-shade")
-                    .attr('opacity', 0.0);
         }
     }
     

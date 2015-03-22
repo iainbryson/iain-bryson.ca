@@ -16,7 +16,7 @@ app.get("/data", function (req, res) {
 
     res.setHeader("Content-Type", "text/json");
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.end(JSON.stringify(budget_info))
+    res.end(JSON.stringify(travel_data.budget_info))
 });
 
 app.use(methodOverride());

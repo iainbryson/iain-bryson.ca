@@ -26,7 +26,7 @@ Spreadsheet.load({
         
         console.log("received spreadsheet.")
 
-        budget_info = { 'rows' : rows, 'info' : info };
+        exports.budget_info = { 'rows' : rows, 'info' : info };
     });
 
 });
